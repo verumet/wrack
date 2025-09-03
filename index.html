@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wrack</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f4f8;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            width: 100%;
+            background-color: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            padding: 30px;
+            margin-top: 20px;
+            position: relative;
+        }
+        input[type="number"]::-webkit-outer-spin-button,
+        input[type="number"]::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        input[type="number"] {
+            -moz-appearance: textfield;
+        }
+        .settings-panel {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 1000;
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-blue-100 to-indigo-100 text-gray-900">
+    <div class="container space-y-8 p-6 md:p-10">
+        <h1 class="text-4xl md:text-5xl font-extrabold text-center text-gray-900 mb-8 tracking-tight">
+            Wrack
+        </h1>
+
+        <button id="settingsBtn" class="absolute top-4 right-4 p-2 rounded-full text-indigo-600 hover:text-indigo-800 transition">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-6 h-6">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 11-3 0m3 0a1.5 1.5 0 10-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-9.75 0h9.75" />
+            </svg>
+        </button>
+
+        <section class="bg-blue-50 p-6 rounded-xl shadow-md">
+            <h2 class="text-2xl font-bold text-gray-900 mb-4 md:mb-0">Current Measurements</h2>
+            <div id="userInfo" class="mb-4 text-lg font-semibold text-gray-800">
+                <span id="displayName"></span> (<span id="displayAge"></span>)
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <div>
+                    <label for="weightInput" class="block text-sm font-medium text-gray-700 mb-1">Weight (kg):</label>
+                    <input type="number" id="weightInput" step="0.1"
+                           class="w-full p-3 border border-blue-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out"
+                           placeholder="Enter weight in kg">
+                </div>
+                <div>
+                    <label for="heightCmInput" class="block text-sm font-medium text-gray-700 mb-1">Height (cm):</label>
+                    <input type="number" id="heightCmInput"
+                           class="w-full p-3 border border-blue-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out"
+                           placeholder="Enter height in cm">
+                </div>
+            </div>
+            <div class="flex justify-center gap-4">
+                <button id="addEntryBtn"
+                        class="px-8 py-4 bg-green-500 text-white font-bold rounded-lg shadow-lg hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-400 focus:ring-offset-2 transition duration-150 ease-in-out transform hover:scale-105">
+                    Add Entry
+                </button>
+            </div>
+            <div class="mt-8 text-xl font-bold text-center text-gray-900">
+                Latest: Weight <span id="displayWeight">N/A</span> | Height <span id="displayHeight">N/A</span>
+            </div>
+        </section>
+
+        <section class="bg-white p-6 rounded-xl shadow-md">
+            <h2 class="text-2xl font-bold text-gray-900 mb-4">Progress Chart</h2>
+            <div class="flex items-center justify-center space-x-4 mb-4">
+                <label class="flex items-center text-gray-700">
+                    <input type="checkbox" id="showWeight" class="form-checkbox text-blue-600 h-5 w-5 rounded focus:ring-blue-500" checked>
+                    <span class="ml-2">Weight</span>
+                </label>
+                <label class="flex items-center text-gray-700">
+                    <input type="checkbox" id="showHeight" class="form-checkbox text-green-600 h-5 w-5 rounded focus:ring-green-500" checked>
+                    <span class="ml-2">Height</span>
+                </label>
+            </div>
+            <div class="relative h-80">
+                <canvas id="progressChart"></canvas>
+            </div>
+        </section>
+
+        <section class="bg-gray-50 p-6 rounded-xl shadow-md">
+            <h2 class="text-2xl font-bold text-gray-900 mb-4">Measurement History</h2>
+            <div class="overflow-x-auto rounded-lg border border-gray-200 shadow-sm">
+                <table class="min-w-full divide-y divide-gray-200 text-gray-900">
+                    <thead class="bg-gray-100">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Weight (kg)</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Height (cm)</th>
+                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="historyTableBody" class="bg-white divide-y divide-gray-200">
+                    </tbody>
+                </table>
+            </div>
+            <div class="flex justify-center mt-6">
+                <button id="clearDataBtn"
+                        class="px-6 py-3 bg-red-500 text-white font-semibold rounded-lg shadow-md hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-400 focus:ring-offset-2 transition duration-150 ease-in-out">
+                    Clear All Data
+                </button>
+            </div>
+        </section>
+
+        <div id="messageBox" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 hidden">
+            <div class="bg-white rounded-lg shadow-xl p-6 max-w-sm w-full text-center">
+                <p id="messageText" class="text-lg font-medium text-gray-800 mb-4"></p>
+                <button id="messageBoxClose"
+                        class="px-6 py-3 bg-indigo-600 text-white font-semibold rounded-lg shadow-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition duration-150 ease-in-out">
+                    OK
+                </button>
+            </div>
+        </div>
+
+        <div id="settingsPanel" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 hidden">
+            <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-sm">
+                <h2 class="text-2xl font-bold mb-4 text-center text-gray-900">Settings</h2>
+                <div class="space-y-4">
+                    <div>
+                        <label for="nameInput" class="block text-sm font-medium text-gray-700">Name:</label>
+                        <input type="text" id="nameInput" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-2" placeholder="Your name">
+                    </div>
+                    <div>
+                        <label for="birthdateInput" class="block text-sm font-medium text-gray-700">Birthdate:</label>
+                        <input type="date" id="birthdateInput" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-2">
+                    </div>
+                </div>
+                <div class="mt-6 flex justify-end">
+                    <button id="closeSettingsBtn"
+                            class="px-6 py-3 bg-indigo-600 text-white font-semibold rounded-lg shadow-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition duration-150 ease-in-out">
+                        Done
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const weightInput = document.getElementById('weightInput');
+        const heightCmInput = document.getElementById('heightCmInput');
+        const addEntryBtn = document.getElementById('addEntryBtn');
+        const displayWeight = document.getElementById('displayWeight');
+        const displayHeight = document.getElementById('displayHeight');
+        const historyTableBody = document.getElementById('historyTableBody');
+        const clearDataBtn = document.getElementById('clearDataBtn');
+        const messageBox = document.getElementById('messageBox');
+        const messageText = document.getElementById('messageText');
+        const messageBoxClose = document.getElementById('messageBoxClose');
+        const progressChartCanvas = document.getElementById('progressChart');
+        const settingsBtn = document.getElementById('settingsBtn');
+        const settingsPanel = document.getElementById('settingsPanel');
+        const closeSettingsBtn = document.getElementById('closeSettingsBtn');
+        const nameInput = document.getElementById('nameInput');
+        const birthdateInput = document.getElementById('birthdateInput');
+        const displayName = document.getElementById('displayName');
+        const displayAge = document.getElementById('displayAge');
+        const showWeightCheckbox = document.getElementById('showWeight');
+        const showHeightCheckbox = document.getElementById('showHeight');
+        let userData = {
+            name: '',
+            birthdate: '',
+            records: []
+        };
+        let progressChartInstance = null;
+        const LOCAL_STORAGE_KEY = 'wrackUserData';
+        function showMessageBox(message) {
+            messageText.textContent = message;
+            messageBox.classList.remove('hidden');
+        }
+        function calculateAge(birthdateStr) {
+            if (!birthdateStr) return 'N/A';
+            const birthDate = new Date(birthdateStr);
+            const today = new Date();
+            let age = today.getFullYear() - birthDate.getFullYear();
+            const m = today.getMonth() - birthDate.getMonth();
+            if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+                age--;
+            }
+            return age >= 0 ? age : 'N/A';
+        }
+        function saveUserData() {
+            try {
+                localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(userData));
+            } catch (e) {
+                showMessageBox("Failed to save data. Your browser may be full or storage is disabled.");
+            }
+        }
+        function loadUserData() {
+            try {
+                const storedData = localStorage.getItem(LOCAL_STORAGE_KEY);
+                if (storedData) {
+                    userData = JSON.parse(storedData);
+                    if (!Array.isArray(userData.records)) {
+                        userData.records = [];
+                    }
+                }
+            } catch (e) {
+                showMessageBox("Failed to load data. Your browser storage might be corrupted.");
+                userData = { name: '', birthdate: '', records: [] };
+            }
+        }
+        function renderCharts() {
+            const dates = userData.records.map(record => record.date);
+            const weights = userData.records.map(record => record.weight);
+            const heights = userData.records.map(record => record.height);
+            if (progressChartInstance) {
+                progressChartInstance.destroy();
+            }
+            progressChartInstance = new Chart(progressChartCanvas, {
+                type: 'line',
+                data: {
+                    labels: dates,
+                    datasets: [
+                        {
+                            label: 'Weight (kg)',
+                            data: weights,
+                            borderColor: '#3B82F6',
+                            backgroundColor: 'rgba(59, 130, 246, 0.2)',
+                            tension: 0.3,
+                            fill: true,
+                            yAxisID: 'yWeight',
+                        },
+                        {
+                            label: 'Height (cm)',
+                            data: heights,
+                            borderColor: '#10B981',
+                            backgroundColor: 'rgba(16, 185, 129, 0.2)',
+                            tension: 0.3,
+                            fill: true,
+                            yAxisID: 'yHeight',
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false,
+                        },
+                        title: {
+                            display: true,
+                            text: 'Progress Over Time',
+                            font: {
+                                size: 16
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Date',
+                                font: { weight: 'bold' }
+                            },
+                            grid: {
+                                display: false
+                            }
+                        },
+                        yWeight: {
+                            type: 'linear',
+                            position: 'left',
+                            title: {
+                                display: true,
+                                text: 'Weight (kg)',
+                                font: { weight: 'bold' }
+                            },
+                            beginAtZero: false,
+                            grid: {
+                                color: 'rgba(200, 200, 200, 0.3)'
+                            }
+                        },
+                        yHeight: {
+                            type: 'linear',
+                            position: 'right',
+                            title: {
+                                display: true,
+                                text: 'Height (cm)',
+                                font: { weight: 'bold' }
+                            },
+                            beginAtZero: false,
+                            grid: {
+                                drawOnChartArea: false,
+                            }
+                        }
+                    }
+                }
+            });
+            updateChartVisibility();
+        }
+        function updateChartVisibility() {
+            if (!progressChartInstance) return;
+            progressChartInstance.data.datasets[0].hidden = !showWeightCheckbox.checked;
+            progressChartInstance.data.datasets[1].hidden = !showHeightCheckbox.checked;
+            progressChartInstance.update();
+        }
+        function renderApp() {
+            displayName.textContent = userData.name || 'Guest';
+            displayAge.textContent = calculateAge(userData.birthdate);
+            if (userData.records.length > 0) {
+                const latest = userData.records[userData.records.length - 1];
+                displayWeight.textContent = `${latest.weight.toFixed(1)} kg`;
+                displayHeight.textContent = `${latest.height.toFixed(1)} cm`;
+            } else {
+                displayWeight.textContent = 'N/A';
+                displayHeight.textContent = 'N/A';
+            }
+            historyTableBody.innerHTML = '';
+            userData.records.forEach((record, index) => {
+                const row = historyTableBody.insertRow();
+                row.className = index % 2 === 0 ? 'bg-white' : 'bg-gray-50';
+                const dateCell = row.insertCell();
+                dateCell.className = 'px-6 py-4 whitespace-nowrap text-sm font-medium';
+                dateCell.textContent = record.date;
+                const weightCell = row.insertCell();
+                weightCell.className = 'px-6 py-4 whitespace-nowrap text-sm';
+                weightCell.textContent = `${record.weight.toFixed(1)} kg`;
+                const heightCell = row.insertCell();
+                heightCell.className = 'px-6 py-4 whitespace-nowrap text-sm';
+                heightCell.textContent = `${record.height.toFixed(1)} cm`;
+                const actionsCell = row.insertCell();
+                actionsCell.className = 'px-6 py-4 whitespace-nowrap text-right text-sm font-medium';
+                const deleteButton = document.createElement('button');
+                deleteButton.textContent = 'Delete';
+                deleteButton.className = 'text-red-600 hover:text-red-900 ml-4';
+                deleteButton.onclick = () => deleteEntry(index);
+                actionsCell.appendChild(deleteButton);
+            });
+            renderCharts();
+        }
+        function deleteEntry(index) {
+            userData.records.splice(index, 1);
+            saveUserData();
+            renderApp();
+            showMessageBox('Entry deleted successfully.');
+        }
+        function handleAddEntry() {
+            const date = new Date().toISOString().slice(0, 10);
+            let weight = parseFloat(weightInput.value);
+            let height = parseFloat(heightCmInput.value);
+            if (isNaN(weight) || weight <= 0) {
+                showMessageBox("Please enter a valid weight in kg.");
+                return;
+            }
+            if (isNaN(height) || height <= 0) {
+                showMessageBox("Please enter a valid height in cm.");
+                return;
+            }
+            userData.records.push({
+                date: date,
+                weight: weight,
+                height: height,
+            });
+            saveUserData();
+            renderApp();
+            showMessageBox('Entry added successfully!');
+            weightInput.value = '';
+            heightCmInput.value = '';
+        }
+        function handleClearAllData() {
+            messageText.innerHTML = "Are you sure you want to clear ALL your Wrack data? This action cannot be undone.";
+            messageBox.classList.remove('hidden');
+            const confirmBtn = document.createElement('button');
+            confirmBtn.textContent = 'Yes, Clear All';
+            confirmBtn.className = 'px-6 py-3 bg-red-600 text-white font-semibold rounded-lg shadow-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition duration-150 ease-in-out mr-2';
+            const cancelBtn = document.createElement('button');
+            cancelBtn.textContent = 'Cancel';
+            cancelBtn.className = 'px-6 py-3 bg-gray-300 text-gray-800 font-semibold rounded-lg shadow-md hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-200 focus:ring-offset-2 transition duration-150 ease-in-out';
+            messageBoxClose.parentNode.replaceChild(confirmBtn, messageBoxClose);
+            confirmBtn.insertAdjacentElement('afterend', cancelBtn);
+            confirmBtn.onclick = () => {
+                localStorage.removeItem(LOCAL_STORAGE_KEY);
+                userData = { name: '', birthdate: '', records: [] };
+                renderApp();
+                messageBox.classList.add('hidden');
+                confirmBtn.parentNode.replaceChild(messageBoxClose, confirmBtn);
+                cancelBtn.remove();
+                showMessageBox('All data cleared successfully.');
+            };
+            cancelBtn.onclick = () => {
+                messageBox.classList.add('hidden');
+                confirmBtn.parentNode.replaceChild(messageBoxClose, confirmBtn);
+                cancelBtn.remove();
+            };
+        }
+        document.addEventListener('DOMContentLoaded', () => {
+            loadUserData();
+            nameInput.value = userData.name;
+            birthdateInput.value = userData.birthdate;
+            renderApp();
+        });
+        addEntryBtn.addEventListener('click', handleAddEntry);
+        clearDataBtn.addEventListener('click', handleClearAllData);
+        messageBoxClose.addEventListener('click', () => {
+            messageBox.classList.add('hidden');
+        });
+        settingsBtn.addEventListener('click', () => {
+            settingsPanel.classList.remove('hidden');
+        });
+        closeSettingsBtn.addEventListener('click', () => {
+            userData.name = nameInput.value;
+            userData.birthdate = birthdateInput.value;
+            saveUserData();
+            renderApp();
+            settingsPanel.classList.add('hidden');
+        });
+        showWeightCheckbox.addEventListener('change', updateChartVisibility);
+        showHeightCheckbox.addEventListener('change', updateChartVisibility);
+    </script>
+</body>
+</html>
